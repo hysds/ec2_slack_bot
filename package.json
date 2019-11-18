@@ -1,0 +1,28 @@
+{
+  "name": "ec2_monitor_bot",
+  "version": "1.0.0",
+  "description": "bot to monitor running EC2 instances and alert in slack if its running too long",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Dustin Lo",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.562.0",
+    "axios": "^0.19.0",
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "express-winston": "^4.0.1",
+    "mysql2": "^2.0.0",
+    "node-cron": "^2.0.3",
+    "pg": "^7.12.1",
+    "sequelize": "^5.21.2",
+    "sqlite3": "^4.1.0",
+    "winston": "^3.2.1",
+    "winston-daily-rotate-file": "^4.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^1.19.4"
+  }
+}

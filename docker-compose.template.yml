@@ -1,0 +1,11 @@
+version: '2'
+services:
+  web:
+    build: .
+    command: node app.js
+    volumes:
+      - "/path/to/.aws:/root/.aws"
+      - /path/to/logs:/root/ec2bot_files/logs # log volume
+      - /path/to/sqlite3:/root/ec2bot_files/sqlite3 # database volume
+    ports:
+      - "3000:3000"

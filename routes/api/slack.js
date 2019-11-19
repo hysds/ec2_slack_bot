@@ -38,8 +38,12 @@ router.post("/instance-action", async (req, res) => {
 
   try {
     const action = payload.actions[0];
-    const instanceId = action.value;
-    const actionType = action.name;
+    let instanceId = action.value;
+    let actionType = action.name;
+
+    // sanintizing the input to prevent XSS attacks
+    instanceId = sanitizer.sanitize(instanceId, "string");
+    actionType = sanitizer.sanitize(actionType, "string");
 
     const instance = await InstanceWarningModel.getByInstanceID(instanceId);
 

@@ -1,4 +1,5 @@
 const AWS = require("aws-sdk");
+var sanitizer = require("sanitizer");
 
 const {
   AWS_REGION,
@@ -46,6 +47,7 @@ const handleSlackEvent = async (id, action) => {
     }
   } catch (err) {
     logger.error(err);
+    throw err;
   }
 };
 
@@ -58,9 +60,14 @@ const processSqsMessage = function(err, data) {
 
     data.Messages.forEach(message => {
       logger.info(`SQS message: ${JSON.stringify(message)}`);
+
       const body = JSON.parse(message.Body);
-      const instanceId = body.instance_id;
-      const action = body.action;
+      let instanceId = body.instance_id;
+      let action = body.action;
+
+      // sanintizing the input to prevent XSS attacks
+      instanceId = sanitizer.sanitize(instanceId, "string");
+      action = sanitizer.sanitize(action, "string");
 
       logger.info(`SQS info: instance id: ${instanceId}, action: ${action}`);
       handleSlackEvent(instanceId, action);

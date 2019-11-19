@@ -27,7 +27,7 @@ cron.schedule(CRON_TAB_SETTINGS, () =>
 
 app = express();
 
-app.use("/api/warnings", require("./routes/api/warnings"));
+// app.use("/api/warnings", require("./routes/api/warnings"));
 app.use("/api/slack", require("./routes/api/slack"));
 
 const PORT = process.env.PORT || 3000;

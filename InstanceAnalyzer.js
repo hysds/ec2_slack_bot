@@ -26,8 +26,12 @@ class InstanceAnalyzer {
     this.aws.config.region = region;
     this.ec2 = new aws.EC2(); // ec2 object
 
+    this.slackMsgTimesleepMS = 1000;
     this.sendSlackMessageURL = "https://slack.com/api/chat.postMessage";
   }
+
+  // sleep for one second so there isnt a error 429
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   sendSlackMessage = async slackMsg => {
     const config = {
@@ -39,7 +43,9 @@ class InstanceAnalyzer {
     try {
       const res = await axios.post(this.sendSlackMessageURL, slackMsg, config);
       if (res.status !== 200) logger.error(res);
+      logger.info(`sent warning message to slack`);
     } catch (err) {
+      logger.error(`${JSON.stringify(slackMsg)} failed to send`);
       logger.error(err.stack);
     }
   };
@@ -67,7 +73,6 @@ class InstanceAnalyzer {
         logger.info("slack message payload:");
         logger.info(JSON.stringify(slackWarningMsg));
         this.sendSlackMessage(slackWarningMsg); // send warning message to slack
-        logger.info(`sent warning message to slack ${id}`);
       } else {
         logger.info(`${id} found in database table`);
         const now = new Date();
@@ -90,7 +95,7 @@ class InstanceAnalyzer {
             const slackShutdownMsg = generateSlackShutdownMessage(name);
             logger.info("slack message payload:");
             logger.info(JSON.stringify(slackShutdownMsg));
-            this.sendSlackMessage(slackShutdownMsg);
+            await this.sendSlackMessage(slackShutdownMsg);
             logger.info(`${name} shutdown message sent to slack`);
           } else {
             // send warning message to slack
@@ -114,7 +119,10 @@ class InstanceAnalyzer {
     const param = generateTagFilters(tagFilters);
     try {
       const instances = await this.ec2.describeInstances(param).promise();
-      instances.Reservations.forEach(row => {
+
+      for (let i = 0; i < instances.Reservations.length; i++) {
+        await this.sleep(this.slackMsgTimesleepMS);
+        let row = instances.Reservations[i];
         const instance = row.Instances[0];
         const instanceId = instance.InstanceId; // getting instance information
         const tags = instance.Tags;
@@ -129,13 +137,11 @@ class InstanceAnalyzer {
 
         // if instance has whitelisted tag, then skip
         const isWhitelisted = checkWhitelist(tags, WHITE_LIST_FILTERS);
-        if (isWhitelisted) {
+        if (isWhitelisted)
           logger.info(`${instanceName} (${instanceId}) whitelisted, skipping!`);
-          return;
-        }
-        if (hoursLaunched >= INSTANCE_TIME_LIMIT)
+        else if (hoursLaunched >= INSTANCE_TIME_LIMIT)
           this.analyzeInstance(instanceId, instanceName, launchTime);
-      });
+      }
     } catch (err) {
       logger.error(err.stack);
     }

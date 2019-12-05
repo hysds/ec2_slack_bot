@@ -121,7 +121,6 @@ class InstanceAnalyzer {
       const instances = await this.ec2.describeInstances(param).promise();
 
       for (let i = 0; i < instances.Reservations.length; i++) {
-        await this.sleep(this.slackMsgTimesleepMS);
         let row = instances.Reservations[i];
         const instance = row.Instances[0];
         const instanceId = instance.InstanceId; // getting instance information
@@ -139,8 +138,10 @@ class InstanceAnalyzer {
         const isWhitelisted = checkWhitelist(tags, WHITE_LIST_FILTERS);
         if (isWhitelisted)
           logger.info(`${instanceName} (${instanceId}) whitelisted, skipping!`);
-        else if (hoursLaunched >= INSTANCE_TIME_LIMIT)
+        else if (hoursLaunched >= INSTANCE_TIME_LIMIT) {
+          await this.sleep(this.slackMsgTimesleepMS);
           this.analyzeInstance(instanceId, instanceName, launchTime);
+        }
       }
     } catch (err) {
       logger.error(err.stack);

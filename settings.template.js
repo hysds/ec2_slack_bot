@@ -7,7 +7,7 @@ module.exports = {
   // will not run any actions if instance has these tags
   WHITE_LIST_FILTERS: [
     // { Key: "Owner", Value: "test@email.com" },
-    { Key: "Owner", Value: "AutoScaling" }
+    { Key: "Owner", Value: "AutoScaling" },
   ],
   // filters for ec2 instances
   TAG_FILTERS: [{ key: "Bravo", value: "pcm" }],
@@ -20,7 +20,7 @@ module.exports = {
   DB_PORT: 5432,
   DB_LOCATION: "/path/to/sqlite/sqlite.db", // sqlite only
 
-  // production mode
+  // production mode (set to true shut down instance, false for dry-run)
   PRODUCTION_MODE: false,
 
   // slack configs
@@ -43,5 +43,5 @@ module.exports = {
   // log directory (winston package will cycle new log file everyday)
   LOG_DIR: "/path/to/log/directory",
 
-  DEBUG: true
+  DEBUG: true,
 };

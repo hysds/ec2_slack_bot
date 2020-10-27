@@ -7,7 +7,7 @@ const {
   generateSlackWarningMessage,
   generateSlackShutdownMessage,
   getInstanceName,
-  checkWhitelist
+  checkWhitelist,
 } = require("./utils");
 
 const {
@@ -15,7 +15,7 @@ const {
   SLACK_TOKEN,
   WHITE_LIST_FILTERS,
   INSTANCE_TIME_LIMIT,
-  MAX_WARNINGS
+  MAX_WARNINGS,
 } = require("./settings");
 
 const { logger } = require("./logger");
@@ -31,14 +31,14 @@ class InstanceAnalyzer {
   }
 
   // sleep for one second so there isnt a error 429
-  sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  sendSlackMessage = async slackMsg => {
+  sendSlackMessage = async (slackMsg) => {
     const config = {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${SLACK_TOKEN}`
-      }
+        Authorization: `Bearer ${SLACK_TOKEN}`,
+      },
     };
     try {
       const res = await axios.post(this.sendSlackMessageURL, slackMsg, config);
@@ -50,7 +50,7 @@ class InstanceAnalyzer {
     }
   };
 
-  shutdownInstance = async id => {
+  shutdownInstance = async (id) => {
     const param = { InstanceIds: [id] };
     try {
       const stopInstance = await this.ec2.stopInstances(param).promise();
@@ -115,7 +115,7 @@ class InstanceAnalyzer {
     }
   };
 
-  checkInstances = async tagFilters => {
+  checkInstances = async (tagFilters) => {
     const param = generateTagFilters(tagFilters);
     try {
       const instances = await this.ec2.describeInstances(param).promise();

@@ -5,7 +5,7 @@ const {
   AWS_REGION,
   SQS_QUEUE_URL,
   SLACK_POSTPONE_EVENT,
-  SLACK_SILENCE_EVENT
+  SLACK_SILENCE_EVENT,
 } = require("../settings");
 
 const sqs = new AWS.SQS({ apiVersion: "2012-11-05" });
@@ -21,7 +21,7 @@ const params = {
   MessageAttributeNames: ["All"],
   QueueUrl: SQS_QUEUE_URL,
   VisibilityTimeout: 10,
-  WaitTimeSeconds: 0
+  WaitTimeSeconds: 0,
 };
 
 const handleSlackEvent = async (id, action) => {
@@ -30,7 +30,7 @@ const handleSlackEvent = async (id, action) => {
 
     if (!instance) {
       logger.error(`instance not found in database: ${id}`);
-      return;
+      return false;
     }
 
     switch (action) {
@@ -45,20 +45,22 @@ const handleSlackEvent = async (id, action) => {
         logger.info(`instance silenced on slack: ${id}`);
         break;
     }
+    return true;
   } catch (err) {
     logger.error(err);
-    throw err;
+    // throw err;
+    return false;
   }
 };
 
-const processSqsMessage = function(err, data) {
+const processSqsMessage = async (err, data) => {
   if (err) {
     logger.error("Error from SQS");
     logger.error(err);
   } else if (data.Messages) {
     logger.info(`Received ${data.Messages.length} messages from SQS`);
 
-    data.Messages.forEach(message => {
+    data.Messages.forEach(async (message) => {
       logger.info(`SQS message: ${JSON.stringify(message)}`);
 
       const body = JSON.parse(message.Body);
@@ -70,19 +72,18 @@ const processSqsMessage = function(err, data) {
       action = sanitizer.sanitize(action, "string");
 
       logger.info(`SQS info: instance id: ${instanceId}, action: ${action}`);
-      handleSlackEvent(instanceId, action);
+      let foundInstance = await handleSlackEvent(instanceId, action);
 
-      const deleteParams = {
-        QueueUrl: SQS_QUEUE_URL,
-        ReceiptHandle: message.ReceiptHandle
-      };
-      sqs.deleteMessage(deleteParams, function(err, data) {
-        if (err) logger.error(`SQS Delete Error: ${err}`);
-        else
-          logger.info(
-            `SQS Message successfully deleted: ${JSON.stringify(data)}`
-          );
-      });
+      if (foundInstance) {
+        const deleteParams = {
+          QueueUrl: SQS_QUEUE_URL,
+          ReceiptHandle: message.ReceiptHandle,
+        };
+        sqs.deleteMessage(deleteParams, function (err, data) {
+          if (err) logger.error(`SQS Delete Error: ${err}`);
+          else logger.info(`SQS Message deleted: ${JSON.stringify(data)}`);
+        });
+      }
     });
   }
 };

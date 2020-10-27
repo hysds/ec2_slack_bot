@@ -9,7 +9,7 @@ const {
   TAG_FILTERS,
   CRON_TAB_SETTINGS,
   USE_SQS,
-  SQS_POLL_RATE
+  SQS_POLL_RATE,
 } = require("./settings");
 
 const { InstanceAnalyzer } = require("./InstanceAnalyzer");

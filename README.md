@@ -22,8 +22,21 @@
 
 <strong>7. Add database credentials, and run the app</strong>
 
-<strong>8a. Run `node app.js`</strong>
+<strong>8. Run `node app.js`</strong>
 
-## If you are using Docker:
-- `docker build -t ec2-instance-bot:<tag> . `
-- `docker run -p 3000:3000 -d ec2-instance-bot:<tag>`
+# Docker
+
+## Building the image
+```bash
+docker build -t ec2-instance-bot:<tag> .
+```
+
+## Running container
+```bash
+docker run -d \
+    -p 6666:3000 \
+    -v /****/.aws:/root/.aws \
+    -v /****/ec2_slack_bot/logs:/root/ec2bot_files/logs \
+    -v /****/ec2_slack_bot/sqlite3:/root/ec2bot_files/sqlite3 \
+    ec2-instance-bot:<tag>
+```

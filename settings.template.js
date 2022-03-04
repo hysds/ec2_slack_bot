@@ -1,6 +1,7 @@
 module.exports = {
   // cron tab settings (https://crontab.guru/)
-  CRON_TAB_SETTINGS: "*/5 * * * *",
+  // CRON_TAB_SETTINGS: "*/5 * * * *",
+  CRON_TAB_SETTINGS: "* * * * *",
 
   // aws configurations
   AWS_REGION: "us-west-2",
@@ -32,7 +33,11 @@ module.exports = {
   SLACK_POSTPONE_EVENT: "postpone",
   SLACK_SILENCE_EVENT: "silence",
 
-  INSTANCE_TIME_LIMIT: 10, // (HOURS) time limit instance have been running before we start warning slack
+  // list of all timezones: https://docs.oracle.com/middleware/12211/wcs/tag-ref/MISC/TimeZones.html
+  TIMEZONE: "America/Los_Angeles",
+
+  // INSTANCE_TIME_LIMIT: 10, // (HOURS) time limit instance have been running before we start warning slack
+  INSTANCE_TIME_LIMIT: 0,
   MAX_WARNINGS: 3, // number of warnings until instance shuts down
 
   // SQS options

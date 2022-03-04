@@ -12,30 +12,28 @@ const transportOptions = [
   new transports.DailyRotateFile({
     name: "ec2-bot-instance",
     datePattern: "YYYY-MM-DD",
-    filename: path.join(LOG_DIR, "ec2-instance-bot.log")
-  })
+    filename: path.join(LOG_DIR, "ec2-instance-bot.log"),
+  }),
 ];
 if (DEBUG) transportOptions.push(new transports.Console());
 
-const serviceLogger = expressWinston.logger({
+exports.serviceLogger = expressWinston.logger({
   format: combine(
     timestamp(),
-    printf(({ level, message, timestamp, meta }) => {
-      return `${timestamp} ${level} ${meta.res.statusCode}: ${message}`;
-    })
+    printf(
+      ({ level, message, timestamp, meta }) =>
+        `${timestamp} ${level} ${meta.res.statusCode}: ${message}`
+    )
   ),
-  transports: transportOptions
+  transports: transportOptions,
 });
 
-const logger = createLogger({
+exports.logger = createLogger({
   format: combine(
     timestamp(),
     printf(
       ({ level, message, timestamp }) => `${timestamp} ${level}: ${message}`
     )
   ),
-  transports: transportOptions
+  transports: transportOptions,
 });
-
-exports.logger = logger;
-exports.serviceLogger = serviceLogger;

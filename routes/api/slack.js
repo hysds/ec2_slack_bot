@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const bodyParser = require("body-parser");
+const sanitizer = require("sanitizer");
 
 const { InstanceWarningModel } = require("../../sequelize/models");
 
@@ -9,7 +10,7 @@ const { validateSignature } = require("../../utils");
 const {
   SLACK_POSTPONE_EVENT,
   SLACK_SILENCE_EVENT,
-  SLACK_SIGNING_SECRET
+  SLACK_SIGNING_SECRET,
 } = require("../../settings");
 
 router.use(serviceLogger);
@@ -25,7 +26,7 @@ router.post("/instance-action", async (req, res) => {
   logger.info(`x-slack-signature: ${slackSignature}`);
   logger.info(`computed slack signature: ${computedHash}`);
 
-  if (headers["x-slack-signature"] !== computedHash) {
+  if (slackSignature !== computedHash) {
     logger.error("Signing Signature Invalid!");
     res.status(401).send("Signing Signature Invalid!");
     return;
@@ -48,10 +49,8 @@ router.post("/instance-action", async (req, res) => {
     const instance = await InstanceWarningModel.getByInstanceID(instanceId);
 
     if (!instance) {
-      logger.error(`Instance not found in database ${instanceId}`);
-      logger.info(
-        `Instance most likely already shut down, sending "success message" message to slack: ${instanceId}`
-      );
+      logger.warning(`Instance not found in database ${instanceId}`);
+      logger.info(`${instanceId} probably already shut down, messaging slack`);
       res.send("Instance already shut down! :man-shrugging:");
       return;
     }
@@ -70,6 +69,9 @@ router.post("/instance-action", async (req, res) => {
         logger.info(`instance silenced on slack: ${instanceId}`);
         res.send("Instance silenced on Slack!");
         break;
+      default:
+        logger.warning(`action not valid: ${actionType}`);
+        res.status(400).send(`action not valid: ${actionType}`);
     }
   } catch (err) {
     logger.error(err.stack);

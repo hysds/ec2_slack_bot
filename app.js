@@ -13,22 +13,22 @@ const {
 } = require("./settings");
 
 const { InstanceAnalyzer } = require("./InstanceAnalyzer");
-const instanceAnalyzer = new InstanceAnalyzer(aws, AWS_REGION);
+const { pollSqsMessages } = require("./sqs");
 
-const { pollSqsMessages } = require("./sqs/message_receiver");
+const instanceAnalyzer = new InstanceAnalyzer(aws, AWS_REGION);
 
 // polling SQS every X seconds to process data from Lambda
 if (USE_SQS) setInterval(() => pollSqsMessages(), SQS_POLL_RATE);
 
-// instanceAnalyzer.checkInstances(TAG_FILTERS);
-cron.schedule(CRON_TAB_SETTINGS, () =>
-  instanceAnalyzer.checkInstances(TAG_FILTERS)
+// (async () => await instanceAnalyzer.checkInstances(TAG_FILTERS))();
+cron.schedule(
+  CRON_TAB_SETTINGS,
+  async () => await instanceAnalyzer.checkInstances(TAG_FILTERS)
 );
 
 app = express();
-
-// app.use("/api/warnings", require("./routes/api/warnings"));
 app.use("/api/slack", require("./routes/api/slack"));
+// app.use("/api/warnings", require("./routes/api/warnings"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => logger.info(`Server started on port ${PORT}!`));

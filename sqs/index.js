@@ -1,5 +1,5 @@
 const AWS = require("aws-sdk");
-var sanitizer = require("sanitizer");
+const sanitizer = require("sanitizer");
 
 const {
   AWS_REGION,

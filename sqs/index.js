@@ -10,7 +10,9 @@ const {
 
 const sqs = new AWS.SQS({ apiVersion: "2012-11-05" });
 
-const { InstanceWarningModel } = require("../sequelize/models");
+const db = require("../db");
+const { Warnings } = db.models;
+
 const { logger } = require("../logger");
 
 AWS.config.region = AWS_REGION;
@@ -26,7 +28,7 @@ const params = {
 
 const handleSlackEvent = async (id, action) => {
   try {
-    const instance = await InstanceWarningModel.getByInstanceID(id);
+    const instance = await Warnings.getByInstanceID(id);
 
     if (!instance) {
       logger.error(`instance not found in database: ${id}`);

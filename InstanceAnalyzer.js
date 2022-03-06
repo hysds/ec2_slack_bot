@@ -1,6 +1,7 @@
 const axios = require("axios");
 
-const { InstanceWarningModel, SlackUsersModel } = require("./sequelize/models"); // SQL table - instance_warning
+const db = require("./db");
+const { Warnings, Users } = db.models;
 
 const {
   getTagValueByKey,
@@ -10,7 +11,6 @@ const {
   generateSlackWarningMessage,
   generateSlackShutdownMessage,
   checkWhitelist,
-  getInstanceOwner,
 } = require("./utils");
 
 const {
@@ -47,7 +47,7 @@ class InstanceAnalyzer {
   };
 
   checkSlackUser = async (email) => {
-    const user = await SlackUsersModel.getByEmail(email);
+    const user = await Users.getByEmail(email);
     if (user) {
       logger.info("slack user found in database", email, user.slackUserId);
       return user.slackUserId;
@@ -56,7 +56,7 @@ class InstanceAnalyzer {
     const slackUserId = await this.getSlackUserIdByEmail(email);
     if (slackUserId) {
       logger.info("Slack user found by email", slackUserId, email);
-      await SlackUsersModel.createUser(slackUserId, email);
+      await Users.createUser(slackUserId, email);
       logger.info("Slack user ID added to database");
       return slackUserId;
     }
@@ -93,10 +93,10 @@ class InstanceAnalyzer {
 
   // TODO: break this function into smaller functions
   analyzeInstance = async (id, name, launchDate) => {
-    const instance = await InstanceWarningModel.getByInstanceID(id);
+    const instance = await Warnings.getByInstanceID(id);
     if (!instance) {
       logger.info(`No record found in database, adding: ${id}`);
-      await InstanceWarningModel.createWarning(id, name, launchDate);
+      await Warnings.createWarning(id, name, launchDate);
       const slackWarningMsg = generateSlackWarningMessage(id, name);
       await this.sendSlackMsg(slackWarningMsg); // send warning message to slack
       return;
@@ -112,7 +112,7 @@ class InstanceAnalyzer {
       if (PRODUCTION_MODE) await this.shutdownInstance(id);
       else logger.info("prod mode set to FALSE, will not shut down");
 
-      await InstanceWarningModel.removeInstanceById(id);
+      await Warnings.removeInstanceById(id);
       const slackShutdownMsg = generateSlackShutdownMessage(name);
       await this.sendSlackMsg(slackShutdownMsg);
       logger.info(`${name} shutdown message sent to slack`);

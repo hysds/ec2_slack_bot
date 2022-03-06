@@ -2,6 +2,7 @@ const express = require("express");
 const cron = require("node-cron");
 const aws = require("aws-sdk");
 
+const db = require("./db");
 const { logger } = require("./logger");
 
 const {
@@ -11,6 +12,8 @@ const {
   USE_SQS,
   SQS_POLL_RATE,
 } = require("./settings");
+
+db.init();
 
 const { InstanceAnalyzer } = require("./InstanceAnalyzer");
 const { pollSqsMessages } = require("./sqs");
@@ -28,7 +31,7 @@ cron.schedule(
 
 app = express();
 app.use("/api/slack", require("./routes/api/slack"));
-// app.use("/api/warnings", require("./routes/api/warnings"));
+app.use("/api/warnings", require("./routes/api/warnings"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => logger.info(`Server started on port ${PORT}!`));

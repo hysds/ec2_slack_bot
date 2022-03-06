@@ -3,7 +3,8 @@ const router = express.Router();
 const bodyParser = require("body-parser");
 const sanitizer = require("sanitizer");
 
-const { InstanceWarningModel } = require("../../sequelize/models");
+const db = require("../../db");
+const { Warnings } = db.models;
 
 const { logger, serviceLogger } = require("../../logger");
 const { validateSignature } = require("../../utils");
@@ -46,7 +47,7 @@ router.post("/instance-action", async (req, res) => {
     instanceId = sanitizer.sanitize(instanceId, "string");
     actionType = sanitizer.sanitize(actionType, "string");
 
-    const instance = await InstanceWarningModel.getByInstanceID(instanceId);
+    const instance = await Warnings.getByInstanceID(instanceId);
 
     if (!instance) {
       logger.warning(`Instance not found in database ${instanceId}`);

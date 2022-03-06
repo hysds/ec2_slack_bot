@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 const bodyParser = require("body-parser");
 
-const { InstanceWarningModel } = require("../../sequelize/models");
+const db = require("../../db");
+const { Warnings } = db.models;
 
 const aws = require("aws-sdk");
 const { AWS_REGION } = require("../../settings");
@@ -18,7 +19,7 @@ router.use(bodyParser.json()); // parse application/json
 router.get("/get-instances/:instance_id", async (req, res) => {
   const id = req.params.instance_id;
   try {
-    instanceWarning = await InstanceWarningModel.getByInstanceID(id);
+    const instanceWarning = await Warnings.getByInstanceID(id);
     res.json(instanceWarning.dataValues);
   } catch (err) {
     res.status(404).send({ message: `instance not found: ${id}` });
@@ -27,7 +28,7 @@ router.get("/get-instances/:instance_id", async (req, res) => {
 
 router.get("/get-instances", async (req, res) => {
   try {
-    const instances = await InstanceWarningModel.findAll();
+    const instances = await Warnings.findAll();
     if (!instances) {
       res.status(404).send({ message: "No instances founnd in database" });
     }

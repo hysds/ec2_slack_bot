@@ -1,9 +1,8 @@
 const path = require("path");
 const Sequelize = require("sequelize");
 
-const defineInstanceModel = require("./models/InstanceWarnings");
-const defineUserModel = require("./models/Users");
-
+const models = require("./models");
+const { DEBUG } = require("../settings");
 const { logger } = require("../logger");
 
 const {
@@ -30,10 +29,13 @@ Sequelize.prototype.init = async function () {
       logger.error(`Unable to connect to the database: ${err}`);
       process.exit(1);
     });
-  await this.sync().catch((err) => logger.error(err));
+  await this.sync()
+    .then(() => logger.info("Database tables synced"))
+    .catch((err) => logger.error(err));
 };
 
 const create = () => {
+  const dbLogger = (msg) => logger.info(msg);
   switch (DB_TYPE) {
     case "sqlite":
     case "sqlite3":
@@ -42,8 +44,7 @@ const create = () => {
         port: DB_PORT,
         pool: connectionPool,
         storage: path.join(DB_LOCATION, DB_NAME), // SQLite only
-        logging: false,
-        // logging: (msg) => logger.info(msg),
+        logging: DEBUG ? dbLogger : false,
       });
     case "postgres":
     case "postgresql":
@@ -53,7 +54,7 @@ const create = () => {
         port: DB_PORT,
         pool: connectionPool,
         logging: false,
-        // logging: (msg) => logger.info(msg),
+        logging: DEBUG ? dbLogger : false,
       });
     case "mysql":
       return new Sequelize(DB_NAME, DB_USERNAME, DB_PASSWORD, {
@@ -61,7 +62,7 @@ const create = () => {
         host: DB_HOST,
         port: DB_PORT,
         pool: connectionPool,
-        logging: false,
+        logging: DEBUG ? dbLogger : false,
       });
     default:
       throw new Error("Database must be: postgres, mysql or sqlite");
@@ -69,17 +70,6 @@ const create = () => {
 };
 
 const db = create();
-defineInstanceModel(db);
-defineUserModel(db);
+for (const model of models) model(db); // creating the tables
 
 module.exports = db;
-
-// sequelize
-//   .authenticate()
-//   .then(() => logger.info("Connected to database"))
-//   .catch((err) => {
-//     logger.error(`Unable to connect to the database: ${err}`);
-//     process.exit(1);
-//   });
-
-// exports.sequelize = sequelize;

@@ -10,8 +10,7 @@ const {
 exports.getHoursLaunched = (launch) => {
   const now = moment().utc();
   const launchTime = moment(launch).utc();
-  const duration = moment.duration(now, launchTime);
-  return duration.hours();
+  return moment.duration(now.diff(launchTime)).asHours();
 };
 
 exports.sleep = (ms = 750) => new Promise((resolve) => setTimeout(resolve, ms));

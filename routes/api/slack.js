@@ -7,7 +7,7 @@ const db = require("../../db");
 const { Warnings } = db.models;
 
 const { logger, serviceLogger } = require("../../logger");
-const { validateSignature } = require("../../utils");
+const { createSignature } = require("../../utils");
 const {
   SLACK_POSTPONE_EVENT,
   SLACK_SILENCE_EVENT,
@@ -22,7 +22,7 @@ router.post("/instance-action", async (req, res) => {
   const headers = req.headers;
   const slackSignature = headers["x-slack-signature"];
 
-  const computedHash = validateSignature(SLACK_SIGNING_SECRET, body, headers);
+  const computedHash = createSignature(SLACK_SIGNING_SECRET, body, headers);
 
   logger.info(`x-slack-signature: ${slackSignature}`);
   logger.info(`computed slack signature: ${computedHash}`);
@@ -58,11 +58,7 @@ router.post("/instance-action", async (req, res) => {
 
     switch (actionType) {
       case SLACK_POSTPONE_EVENT:
-        const newDelayShutdown = new Date(); // adding new delay shutdown time
-        newDelayShutdown.setTime(newDelayShutdown.getTime() + 60 * 60 * 1000); // adding 1 hour
-
-        await instance.postponeShutdown(newDelayShutdown);
-        logger.info(`shutdown delayed: ${instanceId} ${newDelayShutdown}`);
+        await instance.postponeShutdown();
         res.send("Instance shutdown delayed 1 hour!");
         break;
       case SLACK_SILENCE_EVENT:

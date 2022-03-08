@@ -2,7 +2,6 @@ const path = require("path");
 const Sequelize = require("sequelize");
 
 const models = require("./models");
-const { DEBUG } = require("../settings");
 const { logger } = require("../logger");
 
 const {
@@ -15,14 +14,7 @@ const {
   DB_LOCATION,
 } = require("../settings");
 
-const connectionPool = {
-  max: 10,
-  min: 0,
-  acquire: 30000,
-  idle: 10000,
-};
-
-Sequelize.prototype.init = async function () {
+Sequelize.prototype.initialize = async function () {
   await this.authenticate()
     .then(() => logger.info("Connected to database"))
     .catch((err) => {
@@ -31,20 +23,29 @@ Sequelize.prototype.init = async function () {
     });
   await this.sync()
     .then(() => logger.info("Database tables synced"))
-    .catch((err) => logger.error(err));
+    .catch((err) => {
+      logger.error(err);
+      process.exit(1);
+    });
 };
 
-const create = () => {
-  const dbLogger = (msg) => logger.info(msg);
+const connect = () => {
+  const pool = {
+    max: 10,
+    min: 0,
+    acquire: 30000,
+    idle: 10000,
+  };
   switch (DB_TYPE) {
     case "sqlite":
     case "sqlite3":
       return new Sequelize(DB_NAME, DB_USERNAME, DB_PASSWORD, {
         dialect: "sqlite",
         port: DB_PORT,
-        pool: connectionPool,
-        storage: path.join(DB_LOCATION, DB_NAME), // SQLite only
-        logging: DEBUG ? dbLogger : false,
+        pool,
+        storage: path.join(DB_LOCATION, DB_NAME),
+        logging: false,
+        // logging: (msg) => logger.info(msg),
       });
     case "postgres":
     case "postgresql":
@@ -52,24 +53,24 @@ const create = () => {
         dialect: "postgres",
         host: DB_HOST,
         port: DB_PORT,
-        pool: connectionPool,
+        pool,
         logging: false,
-        logging: DEBUG ? dbLogger : false,
+        // logging: (msg) => logger.info(msg),
       });
     case "mysql":
       return new Sequelize(DB_NAME, DB_USERNAME, DB_PASSWORD, {
         dialect: "mysql",
         host: DB_HOST,
         port: DB_PORT,
-        pool: connectionPool,
-        logging: DEBUG ? dbLogger : false,
+        pool,
+        logging: false,
       });
     default:
       throw new Error("Database must be: postgres, mysql or sqlite");
   }
 };
 
-const db = create();
+const db = connect();
 for (const model of models) model(db); // creating the tables
 
 module.exports = db;

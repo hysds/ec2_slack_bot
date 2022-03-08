@@ -29,7 +29,6 @@ const params = {
 const handleSlackEvent = async (id, action) => {
   try {
     const instance = await Warnings.getByInstanceID(id);
-
     if (!instance) {
       logger.error(`instance not found in database: ${id}`);
       return false;
@@ -37,9 +36,7 @@ const handleSlackEvent = async (id, action) => {
 
     switch (action) {
       case SLACK_POSTPONE_EVENT:
-        const newDelayShutdown = new Date(); // adding new delay shutdown time
-        newDelayShutdown.setTime(newDelayShutdown.getTime() + 60 * 60 * 1000); // adding 1 hour
-        await instance.postponeShutdown(newDelayShutdown);
+        await instance.postponeShutdown();
         logger.info(`shutdown delayed: ${id} ${newDelayShutdown}`);
         break;
       case SLACK_SILENCE_EVENT:
@@ -50,44 +47,54 @@ const handleSlackEvent = async (id, action) => {
     return true;
   } catch (err) {
     logger.error(err);
-    // throw err;
     return false;
   }
 };
 
 const processSqsMessage = async (err, data) => {
   if (err) {
-    logger.error("Error from SQS");
     logger.error(err);
-  } else if (data.Messages) {
-    logger.info(`Received ${data.Messages.length} messages from SQS`);
-
-    data.Messages.forEach(async (message) => {
-      logger.info(`SQS message: ${JSON.stringify(message)}`);
-
-      const body = JSON.parse(message.Body);
-      let instanceId = body.instance_id;
-      let action = body.action;
-
-      // sanintizing the input to prevent XSS attacks
-      instanceId = sanitizer.sanitize(instanceId, "string");
-      action = sanitizer.sanitize(action, "string");
-
-      logger.info(`SQS info: instance id: ${instanceId}, action: ${action}`);
-      let foundInstance = await handleSlackEvent(instanceId, action);
-
-      if (foundInstance) {
-        const deleteParams = {
-          QueueUrl: SQS_QUEUE_URL,
-          ReceiptHandle: message.ReceiptHandle,
-        };
-        sqs.deleteMessage(deleteParams, function (err, data) {
-          if (err) logger.error(`SQS Delete Error: ${err}`);
-          else logger.info(`SQS Message deleted: ${JSON.stringify(data)}`);
-        });
-      }
-    });
+    return;
   }
+  if (!data.Messages) return;
+
+  logger.info(`Received ${data.Messages.length} messages from SQS`);
+  data.Messages.map(async (msg) => {
+    logger.info(`SQS message: ${JSON.stringify(msg)}`);
+
+    const body = JSON.parse(msg.Body);
+    const { action, instance_id: instanceId } = body;
+
+    // sanintizing the input to prevent XSS attacks
+    instanceId = sanitizer.sanitize(instanceId, "string");
+    action = sanitizer.sanitize(action, "string");
+
+    logger.info(`SQS info: instance id: ${instanceId}, action: ${action}`);
+    let foundInstance = await handleSlackEvent(instanceId, action);
+
+    if (foundInstance) {
+      const deleteParams = {
+        QueueUrl: SQS_QUEUE_URL,
+        ReceiptHandle: msg.ReceiptHandle,
+      };
+      sqs.deleteMessage(deleteParams, function (err, data) {
+        if (err) logger.error(`SQS Delete Error: ${err}`);
+        else logger.info(`SQS Message deleted: ${JSON.stringify(data)}`);
+      });
+    }
+  });
 };
 
 exports.pollSqsMessages = () => sqs.receiveMessage(params, processSqsMessage);
+
+// exports.pollSqsMessages = async () => {
+//   while (true) {
+//     try {
+//       const data = await sqs.receiveMessage(params).promise();
+//       await processSqsMessage(data);
+//     } catch (err) {
+//       throw err;
+//     }
+//     await sleep(SQS_POLL_RATE);
+//   }
+// };

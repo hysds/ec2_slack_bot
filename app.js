@@ -1,6 +1,5 @@
 const express = require("express");
 const cron = require("node-cron");
-const aws = require("aws-sdk");
 
 const db = require("./db");
 const { logger } = require("./logger");
@@ -13,12 +12,12 @@ const {
   SQS_POLL_RATE,
 } = require("./settings");
 
-db.init();
+db.initialize();
 
 const { InstanceAnalyzer } = require("./InstanceAnalyzer");
 const { pollSqsMessages } = require("./sqs");
 
-const instanceAnalyzer = new InstanceAnalyzer(aws, AWS_REGION);
+const instanceAnalyzer = new InstanceAnalyzer(AWS_REGION);
 
 // polling SQS every X seconds to process data from Lambda
 if (USE_SQS) setInterval(() => pollSqsMessages(), SQS_POLL_RATE);

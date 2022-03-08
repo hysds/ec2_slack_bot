@@ -5,11 +5,7 @@ FROM node:latest
 RUN apt-get update -y && \
   apt-get install vim -y && \
   apt-get install sqlite3 -y && \
-  apt-get install jq -y && \
   apt-get clean -y
-
-# COPY package*.json ./
-# RUN npm install
 
 RUN mkdir /root/ec2bot_files && \
   mkdir /root/ec2bot_files/logs && \

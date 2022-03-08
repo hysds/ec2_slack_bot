@@ -1,11 +1,14 @@
 const axios = require("axios");
+const moment = require("moment-timezone");
+
+const aws = require("aws-sdk");
 
 const db = require("./db");
-const { Warnings, Users } = db.models;
+const { Warnings } = db.models;
 
 const {
   getTagValueByKey,
-  getHoursSinceLaunch,
+  getHoursLaunched,
   sleep,
   generateTagFilters,
   generateSlackWarningMessage,
@@ -24,44 +27,9 @@ const {
 const { logger } = require("./logger");
 
 class InstanceAnalyzer {
-  constructor(aws, region) {
-    this.aws = aws; // require('aws')
-    this.aws.config.region = region;
-    this.ec2 = new aws.EC2(); // ec2 object
+  constructor(region) {
+    this.ec2 = new aws.EC2({ region });
   }
-
-  getSlackUserIdByEmail = async (email) => {
-    const endpoint = `https://slack.com/api/users.lookupByEmail?token=${SLACK_TOKEN}&email=${email}`;
-    try {
-      const res = await axios.get(endpoint);
-      const { data } = res;
-      if (!data.ok) {
-        logger.warn(`slack rest API error: ${email} ${data.error}`);
-        return null;
-      }
-      return data.user.id;
-    } catch (err) {
-      logger.warn(`Unable to call slack rest API: users.lookupByEmail`);
-      return null;
-    }
-  };
-
-  checkSlackUser = async (email) => {
-    const user = await Users.getByEmail(email);
-    if (user) {
-      logger.info("slack user found in database", email, user.slackUserId);
-      return user.slackUserId;
-    }
-    logger.info("slack user not found in database, checking slack API");
-    const slackUserId = await this.getSlackUserIdByEmail(email);
-    if (slackUserId) {
-      logger.info("Slack user found by email", slackUserId, email);
-      await Users.createUser(slackUserId, email);
-      logger.info("Slack user ID added to database");
-      return slackUserId;
-    }
-    return null;
-  };
 
   sendSlackMsg = async (slackMsg) => {
     await sleep();
@@ -75,13 +43,31 @@ class InstanceAnalyzer {
     try {
       const res = await axios.post(endpoint, slackMsg, config);
       if (res.status !== 200) logger.error(res);
+      else {
+        const { data } = res;
+        if (!data.ok) logger.error(data.error);
+      }
     } catch (err) {
       logger.error(`${JSON.stringify(slackMsg)} failed to send`);
       logger.error(err.stack);
     }
   };
 
+  warnUser = async (id, name) => {
+    const slackWarningMsg = generateSlackWarningMessage(id, name);
+    await this.sendSlackMsg(slackWarningMsg);
+    logger.info(`sent warning message to slack ${name} - ${id}`);
+  };
+
+  removeInstanceAndMsgSlack = async (id, name) => {
+    await Warnings.removeByInstanceId(id);
+    const slackShutdownMsg = generateSlackShutdownMessage(name);
+    await this.sendSlackMsg(slackShutdownMsg);
+    logger.info(`shutdown message sent to slack ${name} - ${id}`);
+  };
+
   shutdownInstance = async (id) => {
+    logger.info(`${id} warned ${MAX_WARNINGS}+ times, shutting down...`);
     const param = { InstanceIds: [id] };
     try {
       const stopInstance = await this.ec2.stopInstances(param).promise();
@@ -91,56 +77,17 @@ class InstanceAnalyzer {
     }
   };
 
-  // TODO: break this function into smaller functions
-  analyzeInstance = async (id, name, launchDate) => {
-    const instance = await Warnings.getByInstanceID(id);
-    if (!instance) {
-      logger.info(`No record found in database, adding: ${id}`);
-      await Warnings.createWarning(id, name, launchDate);
-      const slackWarningMsg = generateSlackWarningMessage(id, name);
-      await this.sendSlackMsg(slackWarningMsg); // send warning message to slack
-      return;
-    }
-    if (instance.delayShutdown && new Date() < instance.delayShutdown) {
-      logger.info(`instance is safe, will not warn: ${id}`); // less than delayshutdown time, do nothing
-      return;
-    }
-
-    const strikes = instance.dataValues.strikes;
-    if (strikes >= MAX_WARNINGS) {
-      logger.info(`${id} warned ${MAX_WARNINGS}+ times, shutting down...`);
-      if (PRODUCTION_MODE) await this.shutdownInstance(id);
-      else logger.info("prod mode set to FALSE, will not shut down");
-
-      await Warnings.removeInstanceById(id);
-      const slackShutdownMsg = generateSlackShutdownMessage(name);
-      await this.sendSlackMsg(slackShutdownMsg);
-      logger.info(`${name} shutdown message sent to slack`);
-      return;
-    }
-    // send warning message to slack
-    await instance.update({ strikes: strikes + 1 });
-    if (!instance.silenced) {
-      const slackWarningMsg = generateSlackWarningMessage(id, name);
-      await this.sendSlackMsg(slackWarningMsg);
-      logger.info(`sent warning message to slack ${id}`);
-    }
-  };
-
   checkInstances = async (tagFilters) => {
     const param = generateTagFilters(tagFilters);
     try {
       const instances = await this.ec2.describeInstances(param).promise();
-
       for (const row of instances.Reservations) {
         const metadata = row.Instances[0];
         const { InstanceId: id, Tags, LaunchTime } = metadata;
-
         const name = getTagValueByKey(Tags, "Name");
-        const hoursLaunched = getHoursSinceLaunch(LaunchTime);
+        const hoursLaunched = getHoursLaunched(LaunchTime);
 
-        // if instance has whitelisted tag, then skip
-        const isWhitelisted = checkWhitelist(Tags, WHITE_LIST_FILTERS);
+        const isWhitelisted = checkWhitelist(Tags, WHITE_LIST_FILTERS); // skip if instance has whitelisted tag
         if (isWhitelisted) {
           logger.info(`${name} (${id}) whitelisted, skipping!`);
           continue;
@@ -149,7 +96,30 @@ class InstanceAnalyzer {
         logger.info(`tags: ${JSON.stringify(Tags)}`);
         if (hoursLaunched < INSTANCE_TIME_LIMIT) continue;
 
-        await this.analyzeInstance(id, name, LaunchTime);
+        const record = await Warnings.getByInstanceID(id); // checking database if instance has been audited
+        if (!record) {
+          await Warnings.createWarning(id, name, LaunchTime); // create record in table
+          await this.warnUser(id, name); // send warning message to slack
+          continue;
+        }
+
+        const { delayShutdown } = record;
+        const { strikes, silenced } = record.dataValues;
+        if (delayShutdown && moment().utc() < moment(delayShutdown).utc()) {
+          logger.info(`instance is safe, will not warn: ${id}`); // less than delayshutdown time, do nothing
+          continue;
+        }
+
+        if (strikes < MAX_WARNINGS) {
+          await record.addStrike();
+          if (!silenced) await this.warnUser(id, name, silenced);
+          continue;
+        }
+
+        // if enough warnings, message slack and shut down instance
+        if (PRODUCTION_MODE) await this.shutdownInstance(id);
+        else logger.info(`prod mode set to FALSE, will not shut down ${name}`);
+        await this.removeInstanceAndMsgSlack(id, name);
       }
     } catch (err) {
       logger.error(err.stack);

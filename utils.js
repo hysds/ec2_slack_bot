@@ -1,12 +1,18 @@
 const { createHmac } = require("crypto");
+const moment = require("moment-timezone");
+
 const {
   SLACK_CHANNEL_ID,
   SLACK_POSTPONE_EVENT,
   SLACK_SILENCE_EVENT,
 } = require("./settings");
 
-exports.getHoursSinceLaunch = (launch) =>
-  Math.floor((new Date() - launch) / 1000 / 60 / 60);
+exports.getHoursLaunched = (launch) => {
+  const now = moment().utc();
+  const launchTime = moment(launch).utc();
+  const duration = moment.duration(now, launchTime);
+  return duration.hours();
+};
 
 exports.sleep = (ms = 750) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -22,45 +28,46 @@ exports.getInstanceOwner = (tags) => {
   return owner.includes("@") ? owner : null;
 };
 
-exports.generateTagFilters = (filters) => {
-  const customTagFilters = filters.map((filter) => ({
-    Name: `tag:${filter.key}`,
-    Values: [filter.value],
-  }));
+/**
+ * function to create filter params to describe ec2 instances
+ * ex. { Filters: [{ Name: 'tag:Project', Values: ['foo'] }, ...] }
+ * @param {Array.<Object>}
+ * @returns {Array.<Object>}
+ */
+exports.generateTagFilters = (filters) => ({
+  Filters: [
+    { Name: "instance-state-name", Values: ["running"] },
+    ...filters.map((filter) => ({
+      Name: `tag:${filter.key}`,
+      Values: [filter.value],
+    })),
+  ],
+});
 
-  return {
-    Filters: [
-      { Name: "instance-state-name", Values: ["running"] },
-      ...customTagFilters,
-    ],
-  };
-};
-
+/**
+ * O(N^2) list comparison of tags to list of white listed tags
+ *     ex. [{ Key: 'Bravo', Value: 'adt' }...]
+ * @param {Array.<Object>} tags - list of instance tags
+ * @param {Array.<Object>} whitelist - list of whitelisted tags
+ * @returns {Boolean}
+ */
 exports.checkWhitelist = (tags, whitelist) => {
-  // white list filters: [{ Key: "Owner", Value: "test_email@email.com" }]
-  // tags in the ec2 instance metadata: ex. [{ Key: 'Bravo', Value: 'adt' }...]
   for (let i = 0; i < tags.length; i++) {
     for (let j = 0; j < whitelist.length; j++) {
-      if (
-        tags[i].Key === whitelist[j].Key &&
-        tags[i].Value === whitelist[j].Value
-      )
-        return true;
+      const { Key: tKey, Value: tValue } = tags[i];
+      const { Key: wKey, Value: wValue } = whitelist[j];
+      if (tKey === wKey && tValue === wValue) return true;
     }
   }
   return false;
 };
 
-exports.generateSlackWarningMessage = (
-  instanceId,
-  instanceName,
-  slackUserId = null
-) => ({
+exports.generateSlackWarningMessage = (id, name, slackUserId = null) => ({
   channel: SLACK_CHANNEL_ID,
   mrkdwn: true,
   text: slackUserId
-    ? `<@${slackUserId}> Instance *_${instanceName}_* has ran for too long, select option:`
-    : `Instance *_${instanceName}_* has ran for too long, select option:`,
+    ? `<@${slackUserId}> Instance *_${name}_* has ran for too long, select option:`
+    : `Instance *_${name}_* has ran for too long, select option:`,
   attachments: [
     {
       fallback: "Unable to Process",
@@ -73,27 +80,27 @@ exports.generateSlackWarningMessage = (
           text: "Postpone",
           type: "button",
           style: "primary",
-          value: instanceId,
+          value: id,
         },
         {
           name: SLACK_SILENCE_EVENT,
           text: "Let it die",
           type: "button",
           style: "danger",
-          value: instanceId,
+          value: id,
         },
       ],
     },
   ],
 });
 
-exports.generateSlackShutdownMessage = (instanceName) => ({
+exports.generateSlackShutdownMessage = (name) => ({
   channel: SLACK_CHANNEL_ID,
   mrkdwn: true,
-  text: `Instance *_${instanceName}_* is shutting down :sleeping:`,
+  text: `Instance *_${name}_* is shutting down :sleeping:`,
 });
 
-exports.validateSignature = (signingSecret, reqBody, headers) => {
+exports.createSignature = (signingSecret, reqBody, headers) => {
   const timestamp = headers["x-slack-request-timestamp"];
   const sigBasestring = "v0:" + timestamp + ":" + reqBody;
 

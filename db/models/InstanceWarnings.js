@@ -1,10 +1,11 @@
 const Sequelize = require("sequelize");
 
+const { logger } = require("../../logger");
+
 module.exports = (sequelize) => {
   const model = sequelize.define(
     "Warnings",
     {
-      // attributes
       instanceId: {
         type: Sequelize.STRING,
         field: "instance_id",
@@ -46,46 +47,55 @@ module.exports = (sequelize) => {
     },
     {
       // options
+      freezeTableName: true,
+      tableName: "warnings",
       indexes: [
         {
           unique: true,
           fields: ["instance_id"],
         },
       ],
-      freezeTableName: true,
-      tableName: "warnings",
     }
   );
 
-  model.getByInstanceID = async function (id) {
-    return this.findOne({
-      where: { instanceId: id },
-    });
-  };
-
-  model.removeInstanceById = async function (id) {
-    return this.destroy({
-      where: { instanceId: id },
-    });
-  };
-
   model.createWarning = async function (id, name, launch) {
-    return this.create({
+    logger.info(`adding warning: ${name} (${id}) - ${launch}`);
+    return await this.create({
       instanceId: id,
       name: name,
       launchDate: launch,
     });
   };
 
-  model.prototype.postponeShutdown = async function (delayTime) {
-    return this.update({
-      delayShutdown: delayTime,
+  model.getByInstanceID = async function (id) {
+    return await this.findOne({
+      where: { instanceId: id },
+    });
+  };
+
+  model.removeByInstanceId = async function (id) {
+    return await this.destroy({
+      where: { instanceId: id },
+    });
+  };
+
+  model.prototype.addStrike = async function () {
+    logger.info(`adding strike to instance: ${this.dataValues.instanceId}`);
+    return await this.increment("strikes", { by: 1 });
+  };
+
+  model.prototype.postponeShutdown = async function () {
+    const timestamp = moment().utc();
+    timestamp.add(1, "hours");
+    logger.info(`shutdown delayed: ${this.dataValues.instanceId} ${timestamp}`);
+    return await this.update({
+      delayShutdown: timestamp,
       strikes: 1,
     });
   };
 
   model.prototype.silenceInstance = async function () {
-    return this.update({
+    return await this.update({
       silenced: true,
       delayShutdown: null,
     });
@@ -93,5 +103,3 @@ module.exports = (sequelize) => {
 
   return model;
 };
-
-// exports.model = model;

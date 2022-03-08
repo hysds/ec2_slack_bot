@@ -32,6 +32,8 @@ module.exports = (sequelize) => {
     },
     {
       // options
+      freezeTableName: true,
+      tableName: "users",
       indexes: [
         {
           unique: true,
@@ -42,8 +44,6 @@ module.exports = (sequelize) => {
           fields: ["email"],
         },
       ],
-      freezeTableName: true,
-      tableName: "users",
     }
   );
 

@@ -43,12 +43,15 @@ module.exports = (sequelize) => {
       updatedAt: {
         type: Sequelize.DATE,
         field: "updated_at",
+        defaultValue: Sequelize.NOW,
       },
     },
     {
       // options
       freezeTableName: true,
       tableName: "warnings",
+      timestamps: true,
+      updatedAt: "updated_at",
       indexes: [
         {
           unique: true,
@@ -85,11 +88,9 @@ module.exports = (sequelize) => {
   };
 
   model.prototype.postponeShutdown = async function () {
-    const timestamp = moment().utc();
-    timestamp.add(1, "hours");
     logger.info(`shutdown delayed: ${this.dataValues.instanceId} ${timestamp}`);
     return await this.update({
-      delayShutdown: timestamp,
+      delayShutdown: moment().utc().add(1, "hours"),
       strikes: 1,
     });
   };

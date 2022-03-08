@@ -1,6 +1,8 @@
 const Sequelize = require("sequelize");
+const moment = require("moment-timezone");
 
 const { TIMEZONE } = require("../../settings");
+const { logger } = require("../../logger");
 
 module.exports = (sequelize) => {
   const model = sequelize.define(
@@ -28,12 +30,15 @@ module.exports = (sequelize) => {
       updatedAt: {
         type: Sequelize.DATE,
         field: "updated_at",
+        defaultValue: Sequelize.NOW,
       },
     },
     {
       // options
       freezeTableName: true,
       tableName: "users",
+      timestamps: true,
+      updatedAt: "updated_at",
       indexes: [
         {
           unique: true,
@@ -53,16 +58,27 @@ module.exports = (sequelize) => {
     });
   };
 
-  model.createUser = async function (userId, email) {
-    return await this.create({
-      slackUserId: userId,
-      email,
+  model.deleteByEmail = async function (email) {
+    return await this.destroy({
+      where: { email },
     });
   };
 
-  model.prototype.updateUser = async function (userId) {
-    await this.update({
-      slackUserId: userId,
+  model.createUser = async function (email, id, tz = TIMEZONE) {
+    logger.info(`creating user: ${email} ${id} ${tz}`);
+    return await this.create({
+      email,
+      slackUserId: id,
+      timezone: tz,
+    });
+  };
+
+  model.prototype.updateInfo = async function (id, tz = TIMEZONE) {
+    logger.info(`updating user: ${this.email} (${id}) - ${tz}`);
+    return await this.update({
+      slackUserId: id,
+      timezone: tz,
+      updatedAt: moment().utc(),
     });
   };
 

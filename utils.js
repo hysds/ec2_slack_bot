@@ -10,8 +10,7 @@ const {
 exports.getHoursLaunched = (launch) => {
   const now = moment().utc();
   const launchTime = moment(launch).utc();
-  const duration = moment.duration(now, launchTime);
-  return duration.hours();
+  return moment.duration(now.diff(launchTime)).asHours();
 };
 
 exports.sleep = (ms = 750) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,7 +23,6 @@ exports.getTagValueByKey = (tags, key) => {
 
 exports.getInstanceOwner = (tags) => {
   const owner = this.getTagValueByKey(tags, "Owner") || "";
-  console.log("owner in getInstanceOwner: ", owner);
   return owner.includes("@") ? owner : null;
 };
 
@@ -62,11 +60,11 @@ exports.checkWhitelist = (tags, whitelist) => {
   return false;
 };
 
-exports.generateSlackWarningMessage = (id, name, slackUserId = null) => ({
+exports.generateSlackWarningMessage = (id, name, userId = null) => ({
   channel: SLACK_CHANNEL_ID,
   mrkdwn: true,
-  text: slackUserId
-    ? `<@${slackUserId}> Instance *_${name}_* has ran for too long, select option:`
+  text: userId
+    ? `<@${userId}> Instance *_${name}_* has ran for too long, select option:`
     : `Instance *_${name}_* has ran for too long, select option:`,
   attachments: [
     {
@@ -94,10 +92,12 @@ exports.generateSlackWarningMessage = (id, name, slackUserId = null) => ({
   ],
 });
 
-exports.generateSlackShutdownMessage = (name) => ({
+exports.generateSlackShutdownMessage = (name, userId) => ({
   channel: SLACK_CHANNEL_ID,
   mrkdwn: true,
-  text: `Instance *_${name}_* is shutting down :sleeping:`,
+  text: userId
+    ? `<@${userId}> Instance *_${name}_* is shutting down :sleeping:`
+    : `Instance *_${name}_* is shutting down :sleeping:`,
 });
 
 exports.createSignature = (signingSecret, reqBody, headers) => {

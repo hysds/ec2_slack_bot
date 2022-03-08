@@ -22,11 +22,11 @@ const instanceAnalyzer = new InstanceAnalyzer(AWS_REGION);
 // polling SQS every X seconds to process data from Lambda
 if (USE_SQS) setInterval(() => pollSqsMessages(), SQS_POLL_RATE);
 
-// (async () => await instanceAnalyzer.checkInstances(TAG_FILTERS))();
-cron.schedule(
-  CRON_TAB_SETTINGS,
-  async () => await instanceAnalyzer.checkInstances(TAG_FILTERS)
-);
+(async () => await instanceAnalyzer.checkInstances(TAG_FILTERS))();
+// cron.schedule(
+//   CRON_TAB_SETTINGS,
+//   async () => await instanceAnalyzer.checkInstances(TAG_FILTERS)
+// );
 
 app = express();
 app.use("/api/slack", require("./routes/api/slack"));

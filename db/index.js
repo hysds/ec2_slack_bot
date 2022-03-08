@@ -54,8 +54,8 @@ const connect = () => {
         host: DB_HOST,
         port: DB_PORT,
         pool,
-        // logging: false,
-        logging: (msg) => logger.info(msg),
+        logging: false,
+        // logging: (msg) => logger.info(msg),
       });
     case "mysql":
       return new Sequelize(DB_NAME, DB_USERNAME, DB_PASSWORD, {

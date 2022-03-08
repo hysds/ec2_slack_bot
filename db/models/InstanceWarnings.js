@@ -1,4 +1,5 @@
 const Sequelize = require("sequelize");
+const moment = require("moment-timezone");
 
 const { logger } = require("../../logger");
 
@@ -88,9 +89,10 @@ module.exports = (sequelize) => {
   };
 
   model.prototype.postponeShutdown = async function () {
-    logger.info(`shutdown delayed: ${this.dataValues.instanceId} ${timestamp}`);
+    const delay = moment().utc().add(1, "hours");
+    logger.info(`shutdown delayed: ${this.dataValues.instanceId} ${delay}`);
     return await this.update({
-      delayShutdown: moment().utc().add(1, "hours"),
+      delayShutdown: delay,
       strikes: 1,
     });
   };

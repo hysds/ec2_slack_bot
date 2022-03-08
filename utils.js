@@ -2,12 +2,13 @@ const { createHmac } = require("crypto");
 const moment = require("moment-timezone");
 
 const {
+  TIMEZONE,
   SLACK_CHANNEL_ID,
   SLACK_POSTPONE_EVENT,
   SLACK_SILENCE_EVENT,
 } = require("./settings");
 
-exports.getHoursLaunched = (launch) => {
+exports.getHoursDiff = (launch) => {
   const now = moment().utc();
   const launchTime = moment(launch).utc();
   return moment.duration(now.diff(launchTime)).asHours();
@@ -41,6 +42,15 @@ exports.generateTagFilters = (filters) => ({
     })),
   ],
 });
+
+exports.checkWorkHours = (tz = null) => {
+  tz = tz || TIMEZONE;
+  const now = moment().utc().tz(tz);
+  const day = now.day();
+  const hour = now.hour();
+  if (day > 0 && day < 6 && hour >= 8 && hour < 18) return true; // 8am - 6pm weekdays
+  return false;
+};
 
 /**
  * O(N^2) list comparison of tags to list of white listed tags

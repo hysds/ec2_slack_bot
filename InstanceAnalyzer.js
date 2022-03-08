@@ -9,7 +9,8 @@ const { Warnings, Users } = db.models;
 const {
   sleep,
   getTagValueByKey,
-  getHoursLaunched,
+  getHoursDiff,
+  checkWorkHours,
   generateTagFilters,
   generateSlackWarningMessage,
   generateSlackShutdownMessage,
@@ -52,6 +53,42 @@ class InstanceAnalyzer {
       logger.warn(`Unable to call slack rest API: users.lookupByEmail`);
       return null;
     }
+  };
+
+  /**
+   * validates slack user with supplied email
+   *
+   * @async
+   * @param {String} email
+   * @returns {Promise<String>} - slack's user ID
+   */
+  validateSlackUser = async (email) => {
+    const user = await Users.getByEmail(email);
+    if (!user) {
+      const slackUser = await this.getSlackUserByEmail(email);
+      if (slackUser && !slackUser.deleted) {
+        const { id, timezone } = slackUser;
+        await Users.createUser(email, id, timezone || TIMEZONE);
+        return checkWorkHours(timezone) ? id : null;
+      }
+      return null;
+    }
+    let { updatedAt } = user.dataValues;
+    if (getHoursDiff(moment(updatedAt).utc()) >= 24) {
+      const slackUser = await this.getSlackUserByEmail(email); // get user info from slack
+      if (slackUser && !slackUser.deleted) {
+        if (!slackUser.deleted) {
+          const { id, timezone } = slackUser;
+          await user.updateInfo(id, timezone || TIMEZONE);
+          return checkWorkHours(timezone) ? id : null;
+        }
+        logger.info(`slack marked the user as deleted, deleting ${email}...`);
+        await Users.deleteByEmail(email); // delete the user if marked deleted by slack
+        return null;
+      }
+    }
+    const { slackUserId, timezone } = user.dataValues;
+    return checkWorkHours(timezone) ? slackUserId : null;
   };
 
   sendSlackMsg = async (msg) => {
@@ -108,44 +145,18 @@ class InstanceAnalyzer {
         const metadata = row.Instances[0];
         const { InstanceId: id, Tags, LaunchTime } = metadata;
         const name = getTagValueByKey(Tags, "Name");
-        const hoursLaunched = getHoursLaunched(LaunchTime);
-
+        const hoursLaunched = getHoursDiff(LaunchTime);
         const isWhitelisted = checkWhitelist(Tags, WHITE_LIST_FILTERS); // skip if instance has whitelisted tag
         if (isWhitelisted) {
           logger.info(`${name} (${id}) whitelisted, skipping!`);
           continue;
         }
-        logger.info(`${name} (${id}) - ${hoursLaunched} hrs - ${LaunchTime}`);
+        logger.info(`(${hoursLaunched.toFixed(2)}hrs) ${name} - ${LaunchTime}`);
         logger.info(`tags: ${JSON.stringify(Tags)}`);
         if (hoursLaunched < INSTANCE_TIME_LIMIT) continue;
 
-        let slackUserId = null;
-        const email = await getInstanceOwner(Tags);
-        if (email) {
-          const user = await Users.getByEmail(email);
-          if (!user) {
-            const slackUser = await this.getSlackUserByEmail(email);
-            if (slackUser && !slackUser.deleted) {
-              const { id, timezone } = slackUser;
-              await Users.createUser(email, id, timezone);
-              slackUserId = id;
-            }
-          } else {
-            let { updatedAt } = user.dataValues;
-            updatedAt = moment(updatedAt).utc();
-            const now = moment().utc();
-            if (moment.duration(now.diff(updatedAt)).asHours() >= 24) {
-              const slackUser = await this.getSlackUserByEmail(email); // get user info from slack
-              if (slackUser && !slackUser.deleted) {
-                if (!slackUser.deleted) {
-                  const { id, timezone } = slackUser;
-                  await user.updateInfo(id, timezone || TIMEZONE);
-                  slackUserId = id;
-                } else await Users.deleteByEmail(email); // delete the user if marked deleted by slack
-              }
-            } else slackUserId = user.dataValues.slackUserId;
-          }
-        }
+        const email = getInstanceOwner(Tags);
+        let slackUserId = email ? await this.validateSlackUser(email) : null;
 
         const record = await Warnings.getByInstanceID(id); // checking database if instance has been audited
         if (!record) {
@@ -153,24 +164,20 @@ class InstanceAnalyzer {
           await this.warnUser(id, name, slackUserId); // send warning message to slack
           continue;
         }
-
         const { delayShutdown } = record;
         const { strikes, silenced } = record.dataValues;
         if (delayShutdown && moment().utc() < moment(delayShutdown).utc()) {
           logger.info(`instance is safe, will not warn: ${id}`); // less than delayshutdown time, do nothing
           continue;
         }
-
         if (strikes < MAX_WARNINGS) {
           await record.addStrike();
-          if (!silenced) await this.warnUser(id, name, slackUserId);
+          if (!silenced) await this.warnUser(id, name); //, slackUserId);
           continue;
         }
-
-        // if enough warnings, message slack and shut down instance
         if (PRODUCTION_MODE) await this.shutdownInstance(id);
         else logger.info(`prod mode set to FALSE, will not shut down ${name}`);
-        await this.removeInstanceAndMsgSlack(id, name, slackUserId);
+        await this.removeInstanceAndMsgSlack(id, name, slackUserId); // message slack and shut down instance
       }
     } catch (err) {
       logger.error(err.stack);

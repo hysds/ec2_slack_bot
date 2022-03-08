@@ -34,7 +34,6 @@ router.post("/instance-action", async (req, res) => {
   }
 
   let payload = decodeURIComponent(body);
-  logger.info(payload);
   payload = payload.replace("payload=", "");
   payload = JSON.parse(payload);
 

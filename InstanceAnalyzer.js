@@ -24,7 +24,6 @@ const {
   WHITE_LIST_FILTERS,
   INSTANCE_TIME_LIMIT,
   MAX_WARNINGS,
-  TIMEZONE,
 } = require("./settings");
 
 const { logger } = require("./logger");
@@ -56,11 +55,10 @@ class InstanceAnalyzer {
   };
 
   /**
-   * validates slack user with supplied email
-   *
+   * validates slack user by email and checks if its during work hours
    * @async
    * @param {String} email
-   * @returns {Promise<String>} - slack's user ID
+   * @returns {Promise<String|null>} - slack's user ID
    */
   validateSlackUser = async (email) => {
     const user = await Users.getByEmail(email);
@@ -68,7 +66,7 @@ class InstanceAnalyzer {
       const slackUser = await this.getSlackUserByEmail(email);
       if (slackUser && !slackUser.deleted) {
         const { id, timezone } = slackUser;
-        await Users.createUser(email, id, timezone || TIMEZONE);
+        await Users.createUser(email, id, timezone);
         return checkWorkHours(timezone) ? id : null;
       }
       return null;
@@ -79,7 +77,7 @@ class InstanceAnalyzer {
       if (slackUser && !slackUser.deleted) {
         if (!slackUser.deleted) {
           const { id, timezone } = slackUser;
-          await user.updateInfo(id, timezone || TIMEZONE);
+          await user.updateInfo(id, timezone);
           return checkWorkHours(timezone) ? id : null;
         }
         logger.info(`slack marked the user as deleted, deleting ${email}...`);
@@ -156,7 +154,7 @@ class InstanceAnalyzer {
         if (hoursLaunched < INSTANCE_TIME_LIMIT) continue;
 
         const email = getInstanceOwner(Tags);
-        let slackUserId = email ? await this.validateSlackUser(email) : null;
+        const slackUserId = email ? await this.validateSlackUser(email) : null;
 
         const record = await Warnings.getByInstanceID(id); // checking database if instance has been audited
         if (!record) {

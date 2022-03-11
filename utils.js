@@ -8,7 +8,7 @@ const {
   SLACK_SILENCE_EVENT,
 } = require("./settings");
 
-exports.getHoursDiff = (launch) => {
+exports.hoursDiff = (launch) => {
   const now = moment().utc();
   const launchTime = moment(launch).utc();
   return moment.duration(now.diff(launchTime)).asHours();
@@ -18,8 +18,7 @@ exports.sleep = (ms = 750) => new Promise((resolve) => setTimeout(resolve, ms));
 
 exports.getTagValueByKey = (tags, key) => {
   const obj = tags.find((e) => e.Key === key);
-  if (obj) return obj.Value;
-  return null;
+  return obj ? obj.Value : null;
 };
 
 exports.getInstanceOwner = (tags) => {
@@ -48,26 +47,22 @@ exports.checkWorkHours = (tz = null) => {
   const now = moment().utc().tz(tz);
   const day = now.day();
   const hour = now.hour();
-  if (day > 0 && day < 6 && hour >= 8 && hour < 18) return true; // 8am - 6pm weekdays
+  if (day > 0 && day < 6 && hour > 7 && hour < 18) return true; // 8am - 7pm weekdays
   return false;
 };
 
 /**
- * O(N^2) list comparison of tags to list of white listed tags
+ * O(N) list comparison of tags to list of white listed tags
  *     ex. [{ Key: 'Bravo', Value: 'adt' }...]
  * @param {Array.<Object>} tags - list of instance tags
  * @param {Array.<Object>} whitelist - list of whitelisted tags
  * @returns {Boolean}
  */
 exports.checkWhitelist = (tags, whitelist) => {
-  for (let i = 0; i < tags.length; i++) {
-    for (let j = 0; j < whitelist.length; j++) {
-      const { Key: tKey, Value: tValue } = tags[i];
-      const { Key: wKey, Value: wValue } = whitelist[j];
-      if (tKey === wKey && tValue === wValue) return true;
-    }
-  }
-  return false;
+  const _tags = tags.map((t) => JSON.stringify(t)); // object vs string comparison: O(N^2) -> O(N)
+  const _whitelist = new Set(whitelist.map((t) => JSON.stringify(t)));
+  const hasTag = _tags.find((t) => _whitelist.has(t)); // .find() returns undefined if not found
+  return hasTag !== undefined;
 };
 
 exports.generateSlackWarningMessage = (id, name, userId = null) => ({
@@ -102,7 +97,7 @@ exports.generateSlackWarningMessage = (id, name, userId = null) => ({
   ],
 });
 
-exports.generateSlackShutdownMessage = (name, userId) => ({
+exports.generateSlackShutdownMessage = (name, userId = null) => ({
   channel: SLACK_CHANNEL_ID,
   mrkdwn: true,
   text: userId

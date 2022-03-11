@@ -64,20 +64,20 @@ module.exports = (sequelize) => {
     });
   };
 
-  model.createUser = async function (email, id, tz = TIMEZONE) {
-    logger.info(`creating user: ${email} ${id} ${tz}`);
+  model.createUser = async function (email, id, tz) {
+    logger.info(`creating user: ${email} ${id} ${tz || TIMEZONE}`);
     return await this.create({
       email,
       slackUserId: id,
-      timezone: tz,
+      timezone: tz || TIMEZONE,
     });
   };
 
-  model.prototype.updateInfo = async function (id, tz = TIMEZONE) {
+  model.prototype.updateInfo = async function (id, tz) {
     logger.info(`updating user: ${this.email} (${id}) - ${tz}`);
     return await this.update({
       slackUserId: id,
-      timezone: tz,
+      timezone: tz || TIMEZONE,
       updatedAt: moment().utc(),
     });
   };

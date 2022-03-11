@@ -5,10 +5,6 @@ const bodyParser = require("body-parser");
 const db = require("../../db");
 const { Warnings } = db.models;
 
-const aws = require("aws-sdk");
-const { AWS_REGION } = require("../../settings");
-aws.config.region = AWS_REGION;
-
 const { serviceLogger } = require("../../logger");
 
 router.use(serviceLogger);
@@ -26,7 +22,7 @@ router.get("/get-instances/:instance_id", async (req, res) => {
   }
 });
 
-router.get("/get-instances", async (req, res) => {
+router.get("/get-instances", async (_, res) => {
   try {
     const instances = await Warnings.findAll();
     if (!instances) {
@@ -34,7 +30,7 @@ router.get("/get-instances", async (req, res) => {
     }
     res.json(instances);
   } catch (err) {
-    res.status(500).send({ message: "INTERNAL SERVER ERROR" });
+    res.status(500).send({ message: `Error: ${err}` });
   }
 });
 

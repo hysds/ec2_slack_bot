@@ -58,12 +58,13 @@ router.post("/instance-action", async (req, res) => {
     switch (actionType) {
       case SLACK_POSTPONE_EVENT:
         await instance.postponeShutdown();
-        res.send("Instance shutdown delayed 1 hour!");
+        logger.info(`Instance ${instanceId} shutdown delayed 1 hour!`);
+        res.send(`Instance ${instanceId} shutdown delayed 1 hour!`);
         break;
       case SLACK_SILENCE_EVENT:
         await instance.silenceInstance();
         logger.info(`instance silenced on slack: ${instanceId}`);
-        res.send("Instance silenced on Slack!");
+        res.send(`Instance ${instanceId} silenced on Slack!`);
         break;
       default:
         logger.warning(`action not valid: ${actionType}`);
@@ -71,7 +72,7 @@ router.post("/instance-action", async (req, res) => {
     }
   } catch (err) {
     logger.error(err.stack);
-    res.status(500).send("INTERNAL SERVER ERROR!");
+    res.status(500).send(`Error: ${err}`);
   }
 });
 

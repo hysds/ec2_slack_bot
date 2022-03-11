@@ -1,6 +1,4 @@
-FROM node:latest
-
-# RUN npm install aws-sdk express fs node-cron redis
+FROM node:16
 
 RUN apt-get update -y && \
   apt-get install vim -y && \
@@ -15,8 +13,8 @@ WORKDIR /root/node_app
 
 COPY . .
 
-RUN npm install && \
-  npm install --save sqlite3
+RUN npm install --silent && \
+  npm install --silent --save sqlite3
 
 EXPOSE 3000
 CMD [ "node", "app.js" ]

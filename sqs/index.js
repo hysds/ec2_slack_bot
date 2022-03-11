@@ -17,15 +17,13 @@ const { logger } = require("../logger");
 
 AWS.config.region = AWS_REGION;
 
-const params = {
-  AttributeNames: ["SentTimestamp"],
-  MaxNumberOfMessages: 10,
-  MessageAttributeNames: ["All"],
-  QueueUrl: SQS_QUEUE_URL,
-  VisibilityTimeout: 10,
-  WaitTimeSeconds: 0,
-};
-
+/**
+ * updates instance DB record according to slack event
+ * @async
+ * @param {String} id - instance ID
+ * @param {String} action - action type from Slack
+ * @returns {Promise<Boolean>}
+ */
 const handleSlackEvent = async (id, action) => {
   try {
     const instance = await Warnings.getByInstanceID(id);
@@ -51,6 +49,13 @@ const handleSlackEvent = async (id, action) => {
   }
 };
 
+/**
+ * TODO: change this to async/await w/ .promise()
+ * SQS callback function to handle messages
+ * @async
+ * @param {Error} err
+ * @param {Array.<Object>} data
+ */
 const processSqsMessage = async (err, data) => {
   if (err) {
     logger.error(err);
@@ -85,7 +90,17 @@ const processSqsMessage = async (err, data) => {
   });
 };
 
-exports.pollSqsMessages = () => sqs.receiveMessage(params, processSqsMessage);
+exports.pollSqsMessages = () => {
+  const params = {
+    AttributeNames: ["SentTimestamp"],
+    MaxNumberOfMessages: 10,
+    MessageAttributeNames: ["All"],
+    QueueUrl: SQS_QUEUE_URL,
+    VisibilityTimeout: 10,
+    WaitTimeSeconds: 0,
+  };
+  sqs.receiveMessage(params, processSqsMessage);
+};
 
 // exports.pollSqsMessages = async () => {
 //   while (true) {

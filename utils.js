@@ -1,26 +1,42 @@
 const { createHmac } = require("crypto");
 const moment = require("moment-timezone");
 
-const {
-  TIMEZONE,
-  SLACK_CHANNEL_ID,
-  SLACK_POSTPONE_EVENT,
-  SLACK_SILENCE_EVENT,
-} = require("./settings");
+const { TIMEZONE } = require("./settings");
 
+/**
+ * get the time difference (in hrs) between 2 timestamps
+ * @param {Date} launch
+ * @returns {Number}
+ */
 exports.hoursDiff = (launch) => {
   const now = moment().utc();
   const launchTime = moment(launch).utc();
   return moment.duration(now.diff(launchTime)).asHours();
 };
 
+/**
+ * Async/await style sleep function, similar to python's time.sleep()
+ * @async
+ * @param {Number} ms
+ * @returns {Promise}
+ */
 exports.sleep = (ms = 750) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * return the tag value
+ * @param {Array.<Object>} tags - instance tags
+ * @returns {String|null}
+ */
 exports.getTagValueByKey = (tags, key) => {
   const obj = tags.find((e) => e.Key === key);
   return obj ? obj.Value : null;
 };
 
+/**
+ * return the "Owner" tag value
+ * @param {Array.<Object>} tags - instance tags
+ * @returns {String|null}
+ */
 exports.getInstanceOwner = (tags) => {
   const owner = this.getTagValueByKey(tags, "Owner") || "";
   return owner.includes("@") ? owner : null;
@@ -42,6 +58,11 @@ exports.generateTagFilters = (filters) => ({
   ],
 });
 
+/**
+ * check https://en.wikipedia.org/wiki/List_of_tz_database_time_zones or list of timezones
+ * @param {String} tz - timezone, ex. America/Los_Angeles
+ * @returns
+ */
 exports.checkWorkHours = (tz = null) => {
   tz = tz || TIMEZONE;
   const now = moment().utc().tz(tz);
@@ -65,50 +86,16 @@ exports.checkWhitelist = (tags, whitelist) => {
   return hasTag !== undefined;
 };
 
-exports.generateSlackWarningMessage = (id, name, userId = null) => ({
-  channel: SLACK_CHANNEL_ID,
-  mrkdwn: true,
-  text: userId
-    ? `<@${userId}> Instance *_${name}_* has ran for too long, select option:`
-    : `Instance *_${name}_* has ran for too long, select option:`,
-  attachments: [
-    {
-      fallback: "Unable to Process",
-      callback_id: "wopr_game",
-      color: "#3AA3E3",
-      attachment_type: "default",
-      actions: [
-        {
-          name: SLACK_POSTPONE_EVENT,
-          text: "Postpone",
-          type: "button",
-          style: "primary",
-          value: id,
-        },
-        {
-          name: SLACK_SILENCE_EVENT,
-          text: "Let it die",
-          type: "button",
-          style: "danger",
-          value: id,
-        },
-      ],
-    },
-  ],
-});
-
-exports.generateSlackShutdownMessage = (name, userId = null) => ({
-  channel: SLACK_CHANNEL_ID,
-  mrkdwn: true,
-  text: userId
-    ? `<@${userId}> Instance *_${name}_* is shutting down :sleeping:`
-    : `Instance *_${name}_* is shutting down :sleeping:`,
-});
-
+/**
+ * https://api.slack.com/authentication/verifying-requests-from-slack
+ * @param {String} signingSecret - signing secret provided by slack
+ * @param {String} reqBody
+ * @param {Object} headers - request headers
+ * @returns {String}
+ */
 exports.createSignature = (signingSecret, reqBody, headers) => {
   const timestamp = headers["x-slack-request-timestamp"];
   const sigBasestring = "v0:" + timestamp + ":" + reqBody;
-
   const hash = createHmac("sha256", signingSecret)
     .update(sigBasestring)
     .digest("hex");

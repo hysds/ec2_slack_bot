@@ -2,7 +2,7 @@
   "name": "ec2_monitor_bot",
   "version": "1.0.0",
   "description": "bot to monitor running EC2 instances and alert in slack if its running too long",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon app.js"

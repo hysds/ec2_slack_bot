@@ -1,4 +1,4 @@
-FROM node:latest
+FROM node:16
 
 # RUN npm install aws-sdk express fs node-cron redis
 

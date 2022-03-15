@@ -113,6 +113,7 @@ module.exports = class InstanceAnalyzer {
       }
     } catch (err) {
       logger.error(err.stack);
+      throw err;
     }
   };
 };

@@ -20,7 +20,7 @@ WORKDIR /root/node_app
 COPY . .
 
 RUN npm install && \
-  npm install --save sqlite3
+  npm install --save --python=/usr/bin/python3 sqlite3@5.0.8
 
 EXPOSE 3000
 CMD [ "node", "app.js" ]
